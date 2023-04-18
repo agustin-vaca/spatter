@@ -27,6 +27,7 @@ ADD_DEFINITIONS (-DSG_DATA_TYPE=double)
 IF (NOT (USE_CUDA OR USE_OPENCL OR USE_OPENMP OR USE_SERIAL))
     MESSAGE (
         FATAL_ERROR
+
             "You must build with support for at least one backend. Pass at least one of -DUSE_CUDA=1 -DUSE_OPENCL=1 -DUSE_SERIAL=1 or -DUSE_OPENMP=1 to cmake."
     )
 ENDIF ()
@@ -97,8 +98,13 @@ SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_CURRENT_SOURCE_DIR}/include -
 
 
 #Check if Spatter is compiled on MacOSX. If so, use POSIX_MEMALIGN to allocate memory
+#Add OpenMP flags as specified in issue #110. 
 IF (APPLE)
 	ADD_DEFINITIONS (-DUSE_POSIX_MEMALIGN)
+    SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Xclang -fopenmp")
+    SET (OpenMP_C_LIB_NAMES "libomp")
+    SET (OpenMP_libomp_LIBRARY "omp")
+    SET (OpenMP_CXX_LIB_NAMES "libomp")
 ENDIF ()
 
 # Enable OpenCL

@@ -6,6 +6,17 @@
 #Run the submodule update script
 ./configure/git_submodule_init.sh
 
+#If running on MAC, compile a universal binary omp
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Darwin*)    machine=Mac;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
+if [ ${machine}=Mac ]
+then 
+    brew reinstall --build-from-source --formula ./configure/libomp.rb
+fi
+
 BACKEND=omp
 COMPILER=clang
 
