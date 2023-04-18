@@ -101,10 +101,6 @@ SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_CURRENT_SOURCE_DIR}/include -
 #Add OpenMP flags as specified in issue #110. 
 IF (APPLE)
 	ADD_DEFINITIONS (-DUSE_POSIX_MEMALIGN)
-    SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Xclang -fopenmp")
-    SET (OpenMP_C_LIB_NAMES "libomp")
-    SET (OpenMP_libomp_LIBRARY "omp")
-    SET (OpenMP_CXX_LIB_NAMES "libomp")
 ENDIF ()
 
 # Enable OpenCL
