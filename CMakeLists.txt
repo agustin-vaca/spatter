@@ -111,6 +111,7 @@ IF (USE_OPENCL)
     # Pull the OpenCL-specific files into the build
     FILE (GLOB BACKEND_C_FILES_CL src/opencl/*.c)
     FILE (GLOB BACKEND_H_FILES_CL src/opencl/*.h)
+    MESSAGE ("Using OpenCL backend")
 
     # Copy over the OpenCL kernels used with the binary
     FILE (GLOB OCL_KERNELS src/opencl/*.cl)
@@ -149,6 +150,7 @@ IF (USE_OPENMP)
         # Pull the OpenMP-specific files and kernels into the build
         FILE (GLOB BACKEND_C_FILES_OMP src/openmp/*.c)
         FILE (GLOB BACKEND_H_FILES_OMP src/openmp/*.h)
+        MESSAGE ("Using OpenMP backend")
     ENDIF ()
     SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -171,6 +173,7 @@ IF (USE_CUDA)
     FILE (GLOB CUDA_CU_FILES src/cuda/*.cu)
     FILE (GLOB CUDA_C_FILES src/cuda/*.c)
     FILE (GLOB CUDA_H_FILES src/cuda/*.h)
+    MESSAGE ("Using CUDA backend")
 
     #CUDA Toolkit (Runtime)
     add_library(cuda_comp SHARED src/cuda/my_kernel.cu src/cuda/cuda-backend.cu src/cuda/cuda-backend.h src/cuda/cuda_kernels.h)
