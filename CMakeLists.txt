@@ -105,24 +105,28 @@ ENDIF ()
 
 # Enable OpenCL
 IF (USE_OPENCL)
-    ADD_DEFINITIONS (-DUSE_OPENCL)
-    # Point the compiler to the include and library directories
-    INCLUDE_DIRECTORIES ($ENV{OCL_INCL} src/opencl)
-    # include_directories(/usr/lib/gcc/x86_64-linux-gnu/5/include/)
-    LINK_DIRECTORIES ($ENV{OCL_LIB})
-    # Pull the OpenCL-specific files into the build
-    FILE (GLOB BACKEND_C_FILES_CL src/opencl/*.c)
-    FILE (GLOB BACKEND_H_FILES_CL src/opencl/*.h)
+    find_package(OpenCL REQUIRED)
+    IF (OpenCL_FOUND)
+        #enable pragma region in the code for OpenCL
+        ADD_DEFINITIONS (-DUSE_OPENCL)
+        # Point the compiler to the include and library directories
+        INCLUDE_DIRECTORIES (src/opencl)
+        INCLUDE_DIRECTORIES (${OpenCL_INCLUDE_DIRS})
+        LINK_DIRECTORIES (${OpenCL_LIBRARIES})
+        # Pull the OpenCL-specific files into the build
+        FILE (GLOB BACKEND_C_FILES_CL src/opencl/*.c)
+        FILE (GLOB BACKEND_H_FILES_CL src/opencl/*.h)
 
-    # Copy over the OpenCL kernels used with the binary
-    FILE (GLOB OCL_KERNELS src/opencl/*.cl)
-    FILE (
-        COPY
-        ${OCL_KERNELS}
-        include/sgtype.h
-        DESTINATION
-        ${CMAKE_CURRENT_BINARY_DIR}/kernels/
-    )
+        # Copy over the OpenCL kernels used with the binary
+        FILE (GLOB OCL_KERNELS src/opencl/*.cl)
+        FILE (
+            COPY
+            ${OCL_KERNELS}
+            include/sgtype.h
+            DESTINATION
+            ${CMAKE_CURRENT_BINARY_DIR}/kernels/
+        )
+    ENDIF ()
 ENDIF ()
 
 # Enable Serial backend
@@ -180,9 +184,6 @@ IF (USE_CUDA)
         PROPERTIES
                 CUDA_RUNTIME_LIBRARY Shared
     )
-    target_include_directories(cuda_comp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/cuda")
-
-    #Make
 ENDIF ()
 
 IF (USE_PAPI) 
@@ -239,7 +240,7 @@ IF (USE_OPENMP)
 ENDIF()
 
 IF (USE_OPENCL)
-    TARGET_LINK_LIBRARIES (${TRGT} LINK_PUBLIC OpenCL)
+    TARGET_LINK_LIBRARIES (${TRGT} PUBLIC OpenCL::OpenCL)
 ENDIF ()
 
 # Link math library for json

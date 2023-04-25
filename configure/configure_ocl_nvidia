@@ -6,7 +6,7 @@
 
 # Use the NVIDIA compiler settings
 # TBD - needs to be updated to use FindOpenCL with cmake
-. setenv_ocl.sh 3
+#. setenv_ocl.sh 3
 
 BUILD_DIR=build_ocl
 
