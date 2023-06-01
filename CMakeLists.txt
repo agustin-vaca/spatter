@@ -9,7 +9,7 @@ SET (TRGT spatter)
 
 
 IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    IF ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang"))
+    IF ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
     # Use ASAN when using Clang
     SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
     ENDIF()
