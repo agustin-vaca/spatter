@@ -7,11 +7,11 @@ SET (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Set target project name
 SET (TRGT spatter)
 
-# Use for debugging. TODO: Set this automatically
-IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # Use ASAN when debugging
+
+IF("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+    # Use ASAN when using Clang
     SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+ENDIF()
 
 # Set default values
 SET (USE_CUDA 0 CACHE BOOL "If set, builds with CUDA support")
