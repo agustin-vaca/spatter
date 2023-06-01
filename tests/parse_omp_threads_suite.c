@@ -10,6 +10,18 @@
 
 #define STRLEN (1024)
 
+//Silence ASAN "invalid aligment requested" error
+#ifndef __has_feature
+    // GCC does not have __has_feature...
+    #define __has_feature(feature) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+const char *__asan_default_options() {
+  return "allocator_may_return_null=true";
+}
+#endif
+
 int omp_thread_test(int thread_count, int argc, char** argv)
 {
 #ifndef USE_OPENMP

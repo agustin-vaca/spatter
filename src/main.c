@@ -124,6 +124,18 @@ void print_header(){
 
 }
 
+//Silence ASAN "invalid aligment requested" error
+#ifndef __has_feature
+    // GCC does not have __has_feature...
+    #define __has_feature(feature) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+const char *__asan_default_options() {
+  return "allocator_may_return_null=true";
+}
+#endif
+
 int compare (const void * a, const void * b)
 {
     if (*(double*)a > *(double*)b) return 1;
