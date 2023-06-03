@@ -1,6 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//Silence ASAN "invalid aligment requested" error
+#ifndef __has_feature
+    // GCC does not have __has_feature...
+    #define __has_feature(feature) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+const char *__asan_default_options() {
+  return "allocator_may_return_null=true";
+}
+#endif
+
 int ms1_test_1() {
     int length = 4, locations = 2, gaps = 16;
     for (int i = 0; i < 10; i++) {

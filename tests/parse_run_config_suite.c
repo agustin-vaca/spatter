@@ -5,6 +5,18 @@
 
 #define STRLEN (1024)
 
+//Silence ASAN "invalid aligment requested" error
+#ifndef __has_feature
+    // GCC does not have __has_feature...
+    #define __has_feature(feature) 0
+#endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+const char *__asan_default_options() {
+  return "allocator_may_return_null=true";
+}
+#endif
+
 int k_tests(int argc_, char** argv_, int* nrc, struct run_config* rc)
 {
     int sg_argc_ = 4;
