@@ -70,6 +70,13 @@ long long papi_event_values[PAPI_MAX_COUNTERS];
 extern const char* const papi_ctr_str[];
 #endif
 
+//Silence ASAN 
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+    const char *__asan_default_options() {
+        return "allocator_may_return_null=1";
+    }
+#endif
+
 void print_papi_names() {
 #ifdef USE_PAPI
     printf("\nPAPI Counters: %d\n", papi_nevents);
