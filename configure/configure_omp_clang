@@ -27,3 +27,4 @@ cmake -D CMAKE_BUILD_TYPE=Debug \
 	-D USE_OPENMP=1 \
 	-D USE_CUDA=0 \
 	..
+export ASAN_OPTIONS=allocator_may_return_null=1
