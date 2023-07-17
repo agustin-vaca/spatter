@@ -148,6 +148,9 @@ int compare (const void * a, const void * b)
 /** Time reported in seconds, sizes reported in bytes, bandwidth reported in mib/s"
  */
 double report_time(int ii, double time,  struct run_config rc, int idx){
+    if (time == 0.0) {
+        error("Time is zero", ERROR);
+    }
     size_t bytes_moved = 0;
     double actual_bandwidth = 0;
 
@@ -637,7 +640,7 @@ int main(int argc, char **argv)
         int wpt = 1;
         if (backend == CUDA) {
             float time_ms = 2;
-            for (int i = -10; i < rc2[k].nruns; i++) {
+            for (int i = -10; i < (int) rc2[k].nruns; i++) {
 #define arr_len (1)
                 if (rc2[k].kernel == MULTISCATTER) {
                   unsigned long global_work_size = rc2[k].generic_len / wpt * rc2[k].pattern_scatter_len;
@@ -690,7 +693,7 @@ int main(int argc, char **argv)
             omp_set_num_threads(rc2[k].omp_threads);
 
             // Start at -1 to do a cache warm
-            for (int i = -1; i < rc2[k].nruns; i++) {
+            for (int i = -1; i < (int) rc2[k].nruns; i++) {
 
                 if (i!=-1) sg_zero_time();
 #ifdef USE_PAPI
@@ -778,7 +781,7 @@ int main(int argc, char **argv)
         #ifdef USE_SERIAL
         if (backend == SERIAL) {
 
-            for (int i = -1; i < rc2[k].nruns; i++) {
+            for (int i = -1; i < (int) rc2[k].nruns; i++) {
 
                 if (i!=-1) sg_zero_time();
 #ifdef USE_PAPI
