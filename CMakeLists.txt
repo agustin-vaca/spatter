@@ -1,35 +1,188 @@
 # 3.18 is specified to include FindCUDAToolkit support updates
-CMAKE_MINIMUM_REQUIRED (VERSION 3.18 FATAL_ERROR)
-PROJECT (spatter C CXX)
+cmake_minimum_required (VERSION 3.18 FATAL_ERROR)
 
-SET (CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Check for support for at least one backend
+if ("${BACKEND}" STREQUAL "")
+    message (
+        FATAL_ERROR
+            "You must build with support for at least one backend. Pass at least one of -DBACKEND=serial, openmp, or cuda to cmake."
+    )
+endif ()
+
+# Check for support for at least one compiler
+if ("${COMPILER}" STREQUAL "")
+    message (	
+        FATAL_ERROR	
+            "You must build with support for at least one compiler. Pass at least one of -DCOMPILER=cray, gnu, intel, xl, or nvidia to cmake."	
+    )	
+endif()
+
+#Make backend and compiler variables case insensitive
+string( TOLOWER "${BACKEND}" BACKEND )
+string( TOLOWER "${COMPILER}" COMPILER )
+
+#Set backend permitted values
+set(SPATTERBACKENDS serial openmp cuda)
+
+#Check for backend variable set in user cmake call
+if(NOT BACKEND IN_LIST SPATTERBACKENDS)
+    message(FATAL_ERROR "backend must be one of ${SPATTERBACKENDS}")
+endif()
+
+#Set compiler permitted values
+set(SPATTERCOMPILERS cray gnu clang armclang intel xl nvcc)
+
+#Set intel platform permitted values
+set(INTELPLATFORMS skylake avx_crossplatform non_avx)
+
+#Check for compiler variable set in user cmake call
+if(NOT COMPILER IN_LIST SPATTERCOMPILERS)
+    message(FATAL_ERROR "compiler must be one of ${compilerBackends}")
+endif()
+
+add_definitions (-DSG_DATA_TYPE=double)	
+
+# Set backend specific flags	
+    #SERIAL	
+    if ("${BACKEND}" STREQUAL "serial")	
+        #gnu
+        if ("${COMPILER}" STREQUAL "gnu")
+            set(CMAKE_C_COMPILER gcc)
+            set(CMAKE_CXX_COMPILER g++)
+        #cray
+        elseif ("${COMPILER}" STREQUAL "cray")
+            set(CMAKE_C_COMPILER cc)
+            set(CMAKE_CXX_COMPILER CC)
+        else()
+            message (	
+                FATAL_ERROR
+                    "Only gnu and cray are supported for SERIAL backend"	
+            )
+        endif()
+    endif ()
+
+    #CUDA	
+    if ("${BACKEND}" STREQUAL "cuda")
+        if ("${COMPILER}" STREQUAL "nvcc")
+            set(CMAKE_CUDA_COMPILER nvcc)
+        else()
+            message (
+                FATAL_ERROR
+                    "Only nvcc is supported for CUDA backend"
+            )
+        endif()
+ 
+        if (USE_MPI)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIE")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
+        endif()
+	
+        if (DEFINED CUDA_ARCH)
+            set(CMAKE_CUDA_ARCHITECTURES "${CUDA_ARCH}")
+        else ()
+            message("No CUDA architecture specified, default set to 7.0")
+            set(CMAKE_CUDA_ARCHITECTURES "70")
+        endif ()
+    endif ()
+
+    #OPENMP
+    if ("${BACKEND}" STREQUAL "openmp")	
+        #gnu
+        if ("${COMPILER}" STREQUAL "gnu")
+            set(CMAKE_C_COMPILER gcc)
+            set(CMAKE_CXX_COMPILER g++)
+
+        #cray
+        elseif ("${COMPILER}" STREQUAL "cray")
+            set(CMAKE_C_COMPILER cc)
+            set(CMAKE_CXX_COMPILER CC)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -hlist=m")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -hlist=m")
+            set(CXX_STD 11)
+            if (USE_SVE)
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -homp")
+                set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -homp")
+                set(CMAKE_SYSTEM_NAME "Generic")
+                set(CMAKE_PROCESSOR_NAME "arm")
+            endif()
+
+        #clang
+        elseif ("${COMPILER}" STREQUAL "clang")
+            set(CMAKE_C_COMPILER clang)
+            set(CMAKE_CXX_COMPILER clang++)
+
+        #armclang (wombat)
+        elseif ("${COMPILER}" STREQUAL "armclang")
+            set(CMAKE_CXX_COMPILER armclang)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=thunderx2t99 -mtune=thunderx2t99 -fopenmp")
+            set(USE_OMP_SIMD 1)
+
+        #xl
+        elseif ("${COMPILER}" STREQUAL "xl")
+            set(CMAKE_C_COMPILER xlc_r)
+            set(CMAKE_CXX_COMPILER xlc++_r)
+
+        #intel
+        elseif ("${COMPILER}" STREQUAL "intel")
+
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
+
+            #Check for intel platform variable set in user cmake call
+            if (NOT DEFINED INTEL_PLATFORM)
+                message("No intel platform defined.")
+            else()
+                #Set platform
+                ####
+                string( TOLOWER "${INTEL_PLATFORM}" INTEL_PLATFORM )
+
+                #skylake
+                if("${INTEL_PLATFORM}" STREQUAL "skylake")
+                    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -march=skylake-avx512")
+
+                #cross-platform with AVX
+                elseif("${INTEL_PLATFORM}" STREQUAL "avx_crossplatform")
+                    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -xCOMMON-AVX512")
+                
+                #Non-AVX platforms
+                elseif("${INTEL_PLATFORM}" STREQUAL "non_avx")
+                    #No specified flags
+                else()
+                    message("Platform was not recognized, no options passed.")
+                endif()
+            endif()
+
+            #Set compiler based on options
+            set(CMAKE_C_COMPILER icx)
+            set(CMAKE_CXX_COMPILER icpx)
+
+            #Check disable cpu dispatch flag
+            if (DISABLE_CPU_DISPATCH)
+                set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -diag-disable=15009")
+            endif()
+            if (VEC_REPORT)
+                set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -qopt-report-phase=vec,loop -qopt-report=2")
+            endif()
+        else()
+            message (	
+                FATAL_ERROR
+                    "Only gnu, cray, clang, armclang, intel, and xl are supported for OpenMP backend"	
+            )
+        endif()
+    endif ()
+
+project (spatter C CXX)
+
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set target project name
 set (TRGT spatter)
 
-# Use for debugging. TODO: Set this automatically
 IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # Use ASAN when debugging
-    SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
-
-# Set default values
-SET (USE_CUDA 0 CACHE BOOL "If set, builds with CUDA support")
-SET (USE_OPENCL 0 CACHE BOOL "If set, builds with OpenCL support")
-SET (USE_OPENMP 0 CACHE BOOL "If set, builds with OpenMP support")
-SET (USE_SERIAL 0 CACHE BOOL "If set, builds with Serial support")
-SET (USE_PAPI 0 CACHE BOOL "If set, builds with PAPI support")
-SET (USE_MPI 0 CACHE BOOL "If set, builds with MPI support")
-
-ADD_DEFINITIONS (-DSG_DATA_TYPE=double)
-
-# Check for support for at least one backend
-IF (NOT (USE_CUDA OR USE_OPENCL OR USE_OPENMP OR USE_SERIAL))
-    MESSAGE (
-        FATAL_ERROR
-            "You must build with support for at least one backend. Pass at least one of -DUSE_CUDA=1 -DUSE_OPENCL=1 -DUSE_SERIAL=1 or -DUSE_OPENMP=1 to cmake."
-    )
-ENDIF ()
+    IF ("${BACKEND}" STREQUAL "Clang")
+        # Use ASAN when using Clang
+        SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -O1 -fno-omit-frame-pointer")
+    ENDIF()
+ENDIF()
 
 # Enable CUDA language
 if ("${BACKEND}" STREQUAL "cuda")
