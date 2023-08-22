@@ -178,7 +178,7 @@ set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (TRGT spatter)
 
 IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    IF ("${BACKEND}" STREQUAL "Clang")
+    IF ("${COMPILER}" STREQUAL "Clang")
         # Use ASAN when using Clang
         SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -O1 -fno-omit-frame-pointer")
     ENDIF()
