@@ -16,6 +16,7 @@ hostname
 #This line allows the GH runner to use the module command on the targeted node
 source /tools/misc/.read_profile
 module load cuda
+echo "inside script, you are in $(pwd)"
 cmake -DBACKEND=cuda -DCOMPILER=nvcc -B build_cuda_workflow -S .
 make -C build_cuda_workflow
 cd build_cuda_workflow
