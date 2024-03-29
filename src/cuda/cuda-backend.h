@@ -23,6 +23,7 @@ extern float cuda_block_multiscatter_wrapper(long unsigned dim, long unsigned* g
         int *final_block_idx,
         int *final_thread_idx,
         double *final_gather_data,
+        int atomic_flag,
         char validate);
 extern float cuda_block_multigather_wrapper(long unsigned dim, long unsigned* grid, long unsigned* block,
         double *source,
@@ -45,10 +46,12 @@ extern float cuda_block_sg_wrapper(long unsigned dim, long unsigned* grid, long 
         int *final_block_idx,
         int *final_thread_idx,
         double *final_gather_data,
+        int atomic_flag,
         char validate);
 extern float cuda_block_wrapper(long unsigned dim, long unsigned* grid, long unsigned* block,
         enum sg_kernel kernel,
         double *source,
+        double *target,
         sgIdx_t* pat_dev,
         ssize_t* pat,
         size_t pat_len,
@@ -58,6 +61,7 @@ extern float cuda_block_wrapper(long unsigned dim, long unsigned* grid, long uns
         int *final_block_idx,
         int *final_thread_idx,
         double *final_gather_data,
+        int atomic_flag,
         char validate);
 extern float cuda_block_random_wrapper(long unsigned dim, long unsigned* grid, long unsigned* block,
         enum sg_kernel kernel,

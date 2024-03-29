@@ -45,7 +45,7 @@
 #define xstr(s) str(s)
 #define str(s) #s
 
-const char* SPATTER_VERSION="0.4";
+const char* SPATTER_VERSION="1.0";
 
 //SGBench specific enums
 extern enum sg_backend backend;
@@ -63,6 +63,8 @@ extern int aggregate_flag;
 extern int compress_flag;
 extern int papi_nevents;
 extern int stride_kernel;
+extern int atomic_flag;
+
 #ifdef USE_PAPI
 extern char papi_event_names[PAPI_MAX_COUNTERS][STRING_SIZE];
 int papi_event_codes[PAPI_MAX_COUNTERS];
@@ -113,7 +115,7 @@ void print_system_info(){
 
 void print_header(){
     //printf("kernel op time source_size target_size idx_len bytes_moved actual_bandwidth omp_threads vector_len block_dim shmem\n");
-    printf("%-7s %-12s %-12s", "config", "time(s)","bw(MB/s)");
+    printf("%-7s %-12s %-12s %-12s", "config", "bytes", "time(s)","bw(MB/s)");
 
 #ifdef USE_PAPI
     for (int i = 0; i < papi_nevents; i++) {
@@ -148,7 +150,7 @@ double report_time(int ii, double time,  struct run_config rc, int idx){
         bytes_moved = sizeof(sgData_t) * rc.pattern_len * rc.generic_len;
         actual_bandwidth = bytes_moved / time / 1000. / 1000.;
     }
-    printf("%-7d %-12.4g %-12f", ii, time, actual_bandwidth);
+    printf("%-7d %-12zu %-12.4g %-12f", ii, bytes_moved, time, actual_bandwidth);
 #ifdef USE_PAPI
     for (int i = 0; i < papi_nevents; i++) {
         printf(" %-12lld", rc.papi_ctr[idx][i]);
@@ -634,7 +636,10 @@ int main(int argc, char **argv)
                   unsigned long grid[arr_len] = {global_work_size/local_work_size};
                   unsigned long block[arr_len] = {local_work_size};                  
 
-                  time_ms = cuda_block_multiscatter_wrapper(arr_len, grid, block, source.dev_ptr_cuda, target.dev_ptr_cuda, &rc2[k], pat_dev, pat_scat_dev, wpt, &final_block_idx, &final_thread_idx, &final_gather_data, validate_flag);
+#ifdef USE_MPI
+                  MPI_Barrier(MPI_COMM_WORLD);
+#endif
+                  time_ms = cuda_block_multiscatter_wrapper(arr_len, grid, block, source.dev_ptr_cuda, target.dev_ptr_cuda, &rc2[k], pat_dev, pat_scat_dev, wpt, &final_block_idx, &final_thread_idx, &final_gather_data, atomic_flag, validate_flag);
                 }
                 else if (rc2[k].kernel == MULTIGATHER) {
                   unsigned long global_work_size = rc2[k].generic_len / wpt * rc2[k].pattern_gather_len;
@@ -642,6 +647,9 @@ int main(int argc, char **argv)
                   unsigned long grid[arr_len] = {global_work_size/local_work_size};
                   unsigned long block[arr_len] = {local_work_size};                  
 
+#ifdef USE_MPI
+                  MPI_Barrier(MPI_COMM_WORLD);
+#endif
                   time_ms = cuda_block_multigather_wrapper(arr_len, grid, block, source.dev_ptr_cuda, target.dev_ptr_cuda, &rc2[k], pat_dev, pat_gath_dev, wpt, &final_block_idx, &final_thread_idx, &final_gather_data, validate_flag);
                 }
                 else if (rc2[k].kernel == GS) {
@@ -651,16 +659,33 @@ int main(int argc, char **argv)
                     unsigned long block[arr_len] = {local_work_size};
 
                     assert(rc2[k].pattern_gather_len == rc2[k].pattern_scatter_len);
-                    time_ms = cuda_block_sg_wrapper(arr_len, grid, block, source.dev_ptr_cuda, target.dev_ptr_cuda, &rc2[k], pat_gath_dev, pat_scat_dev, wpt, &final_block_idx, &final_thread_idx, &final_gather_data, validate_flag);
+
+#ifdef USE_MPI
+                    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+                    time_ms = cuda_block_sg_wrapper(arr_len, grid, block, source.dev_ptr_cuda, target.dev_ptr_cuda, &rc2[k], pat_gath_dev, pat_scat_dev, wpt, &final_block_idx, &final_thread_idx, &final_gather_data, atomic_flag, validate_flag);
                 } else {
                     unsigned long global_work_size = rc2[k].generic_len / wpt * rc2[k].pattern_len;
                     unsigned long local_work_size = rc2[k].local_work_size;
                     unsigned long grid[arr_len]  = {global_work_size/local_work_size};
                     unsigned long block[arr_len] = {local_work_size};
 
-                    if (rc2[k].random_seed == 0) {
-                        time_ms = cuda_block_wrapper(arr_len, grid, block, rc2[k].kernel, source.dev_ptr_cuda, pat_dev, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, wpt, rc2[k].ro_morton, rc2[k].ro_order, order_dev, rc[k].stride_kernel, &final_block_idx, &final_thread_idx, &final_gather_data, validate_flag);
+                    if (rc2[k].random_seed == 0) { 
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
+                        time_ms = cuda_block_wrapper(arr_len, grid, block, rc2[k].kernel, source.dev_ptr_cuda, target.dev_ptr_cuda, pat_dev, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, wpt, rc2[k].ro_morton, rc2[k].ro_order, order_dev, rc[k].stride_kernel, &final_block_idx, &final_thread_idx, &final_gather_data, atomic_flag, validate_flag);
                     } else {
+                        if (rc2[k].pattern_len > rc2[k].local_work_size) {
+                            error("Pattern length cannot exceed local_work_size", ERROR);
+                        }
+
+                        if (rc2[k].pattern_len > 1024 || rc2[k].local_work_size > 1024) {
+                            error("Pattern length cannot exceed 1024 on GPU", ERROR);
+                        }
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         time_ms = cuda_block_random_wrapper(arr_len, grid, block, rc2[k].kernel, source.dev_ptr_cuda, pat_dev, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, wpt, rc2[k].random_seed);
                     }
                 }
@@ -680,7 +705,6 @@ int main(int argc, char **argv)
 
             // Start at -1 to do a cache warm
             for (int i = -1; i < (int) rc2[k].nruns; i++) {
-
                 if (i!=-1) sg_zero_time();
 #ifdef USE_PAPI
                 if (i!=-1) profile_start(EventSet, __LINE__, __FILE__);
@@ -689,25 +713,43 @@ int main(int argc, char **argv)
                 switch (rc2[k].kernel) {
                     case MULTISCATTER:
                       if (rc2[k].random_seed >= 1) {
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multiscatter_smallbuf_random(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_scatter, rc2[k].pattern_scatter_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].random_seed);
                       }
                       else if (rc2[k].op == OP_COPY) {
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multiscatter_smallbuf(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_scatter, rc2[k].pattern_scatter_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                       }
                       break;
                     case MULTIGATHER:
                       if (rc2[k].random_seed >= 1) {
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multigather_smallbuf_random(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_gather, rc2[k].pattern_gather_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].random_seed);
                       }
                       else if (rc2[k].deltas_len <= 1) {
                         if (rc2[k].ro_morton || rc2[k].ro_hilbert) {
+#ifdef USE_MPI
+                          MPI_Barrier(MPI_COMM_WORLD);
+#endif
                           multigather_smallbuf_morton(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_gather, rc2[k].pattern_gather_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].ro_order);
                         }
                         else {
+#ifdef USE_MPI
+                          MPI_Barrier(MPI_COMM_WORLD);
+#endif
                           multigather_smallbuf(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_gather, rc2[k].pattern_gather_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                         }
                       }
                       else {
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multigather_smallbuf_multidelta(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_gather, rc2[k].pattern_gather_len, rc2[k].deltas_ps, rc2[k].generic_len, rc2[k].wrap, rc2[k].deltas_len);
                       }
                       break;
@@ -720,13 +762,23 @@ int main(int argc, char **argv)
                         }
                         */
                         assert(rc2[k].pattern_gather_len == rc2[k].pattern_scatter_len);
+
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         sg_smallbuf(source.host_ptr, target.host_ptr, rc2[k].pattern_gather, rc2[k].pattern_scatter, rc2[k].pattern_gather_len, rc2[k].delta_gather, rc2[k].delta_scatter, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     case SCATTER:
                         if (rc2[k].random_seed >= 1) {
+#ifdef USE_MPI
+                            MPI_Barrier(MPI_COMM_WORLD);
+#endif
                             scatter_smallbuf_random(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].random_seed);
                         }
                         else if (rc2[k].op == OP_COPY) {
+#ifdef USE_MPI
+                            MPI_Barrier(MPI_COMM_WORLD);
+#endif
                             scatter_smallbuf(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                             // scatter_omp (target.host_ptr, ti.host_ptr, source.host_ptr, si.host_ptr, index_len);
                         } else {
@@ -735,15 +787,27 @@ int main(int argc, char **argv)
                         break;
                     case GATHER:
                         if (rc2[k].random_seed >= 1) {
+#ifdef USE_MPI
+                            MPI_Barrier(MPI_COMM_WORLD);
+#endif
                             gather_smallbuf_random(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].random_seed);
                         }
                         else if (rc2[k].deltas_len <= 1) {
                             if (rc2[k].ro_morton || rc2[k].ro_hilbert) {
+#ifdef USE_MPI
+                                MPI_Barrier(MPI_COMM_WORLD);
+#endif
                                 gather_smallbuf_morton(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap, rc2[k].ro_order);
                             } else {
+#ifdef USE_MPI
+                                MPI_Barrier(MPI_COMM_WORLD);
+#endif
                                 gather_smallbuf(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                             }
                         } else {
+#ifdef USE_MPI
+                            MPI_Barrier(MPI_COMM_WORLD);
+#endif
                             gather_smallbuf_multidelta(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_len, rc2[k].deltas_ps, rc2[k].generic_len, rc2[k].wrap, rc2[k].deltas_len);
                         }
                         break;
@@ -754,6 +818,10 @@ int main(int argc, char **argv)
 
 #ifdef USE_PAPI
                 if (i!= -1) profile_stop(EventSet, rc2[k].papi_ctr[i], __LINE__, __FILE__);
+#endif
+
+#ifdef USE_MPI
+                MPI_Barrier(MPI_COMM_WORLD);
 #endif
                 if (i!= -1) rc2[k].time_ms[i] = sg_get_time_ms();
 
@@ -776,19 +844,35 @@ int main(int argc, char **argv)
 
                 switch (rc2[k].kernel) {
                     case MULTISCATTER:
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multiscatter_smallbuf_serial(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_scatter, rc2[k].pattern_scatter_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     case MULTIGATHER:
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         multigather_smallbuf_serial(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_gather, rc2[k].pattern_gather_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     case SCATTER:
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         scatter_smallbuf_serial(source.host_ptr, target.host_ptrs, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     case GATHER:
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         gather_smallbuf_serial(target.host_ptrs, source.host_ptr, rc2[k].pattern, rc2[k].pattern_len, rc2[k].delta, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     case GS:
                         assert(rc2[k].pattern_gather_len == rc2[k].pattern_scatter_len);
+
+#ifdef USE_MPI
+                        MPI_Barrier(MPI_COMM_WORLD);
+#endif
                         sg_smallbuf_serial(target.host_ptr, source.host_ptr, rc2[k].pattern_gather, rc2[k].pattern_scatter, rc2[k].pattern_gather_len, rc2[k].delta_gather, rc2[k].delta_scatter, rc2[k].generic_len, rc2[k].wrap);
                         break;
                     default:
@@ -800,6 +884,10 @@ int main(int argc, char **argv)
                 //if (i!=0) report_time(k, time_ms/1000., rc2[k], i);
 #ifdef USE_PAPI
                 if (i!= -1) profile_stop(EventSet, rc2[k].papi_ctr[i], __LINE__, __FILE__);
+#endif
+
+#ifdef USE_MPI
+                MPI_Barrier(MPI_COMM_WORLD);
 #endif
                 if (i!= -1) rc2[k].time_ms[i] = sg_get_time_ms();
             }
@@ -1161,6 +1249,5 @@ spIdx_t remap_pattern(const int nrc, ssize_t *pattern, const spSize_t pattern_le
         }
     }
 
-    printf("Pattern Length: %zu Max Pattern Value: %zu\n\n", pattern_len, max_pattern_val);
     return max_pattern_val;
 }

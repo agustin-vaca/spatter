@@ -52,6 +52,10 @@ To do an MPI build with GNU, note that `Release` build is the default choice whe
 cmake -DBACKEND=openmp -DCOMPILER=gnu -DUSE_MPI=1 -B build_openmp_gnu_mpi -S .
 ```
 
+To do an CUDA build, specify nvcc as the compiler. Note we usually use NVHPC to build Spatter:
+```
+cmake -DBACKEND=cuda -DCOMPILER=nvcc -B build_cuda -S .
+```
 For a complete list of build options, see [Build.md](Build.md)
 
 ## Running Spatter
@@ -81,6 +85,7 @@ Usage:
  -q, --no-print-header        Do not print header information.
  -i, --interactive            Pick the platform and the device interactively.
  --validate                   TODO
+--atomic-writes=<n>           Enable atomic writes for CUDA backend [Default 0/off] (TODO: OpenMP atomics)  
  -a, --aggregate              Report a minimum time for all runs of a given configuration for 2 or more runs. [Default 1] (Do not use with PAPI)
  -c, --compress               TODO
  -p, --pattern=<pattern>      Specify either a built-in pattern (i.e. UNIFORM), a custom pattern (i.e. 1,2,3,4), or a path to a json file with a run-configuration.
@@ -93,12 +98,13 @@ Usage:
  -y, --delta-scatter=<delta[,delta,...]> Specify one or more deltas. [Default: 8] 
  -e, --boundary=<n>           Specify the boundary to mod pattern indices with to limit data array size.
  -j, --pattern-size=<n>       Valid with [kernel-name: Gather, Scatter] and custom patterns (i.e. not UNIFORM, MS1, LAPLACIAN, etc.). Size of Gather/Scatter pattern. Pattern will be truncated to size if used.
+ -u, --strong-scale=<0,1>     Enable Strong Scaling (Will Split Pattern Evenly Amongst Ranks). [Default: Off]
  -l, --count=<n>              Number of Gathers or Scatters to perform.
  -w, --wrap=<n>               Number of independent slots in the small buffer (source buffer if Scatter, Target buffer if Gather. [Default: 1]
  -R, --runs=<n>               Number of times to repeat execution of the kernel. [Default: 10]
  -t, --omp-threads=<n>        Number of OpenMP threads. [Default: OMP_MAX_THREADS]
  -v, --vector-len=<n>         TODO
- -z, --local-work-size=<n>    Numer of Gathers or Scatters performed by each thread on a GPU.
+ -z, --local-work-size=<n>    Number of Gathers or Scatters performed by each thread on a GPU. [Default: 1024]
  -m, --shared-memory=<n>      Amount of dummy shared memory to allocate on GPUs (used for occupancy control).
  -n, --name=<name>            Specify and name this configuration in the output.
  -s, --random=[<n>]           Sets the seed, or uses a random one if no seed is specified.
@@ -262,7 +268,7 @@ Lavin, P., Young, J., Vuduc, R., Riedy, J., Vose, A. and Ernst, D., Evaluating G
 * A supported C/C++ 11 compiler 
   * GCC 
   * Clang 
-* If using CUDA, CUDA 10.0+ 
+* If using CUDA, CUDA 11.0+ 
 * If using OpenMP, OpenMP 3.0+
   * Note: Issues have been reported in Mac systems with OpenMP. If you encounter issues finding OpenMP, please use Spatter in a Linux container. 
 * Spatter can also run serially
